@@ -3,6 +3,8 @@ package com.main.application.ImplementationService;
 import com.main.application.dto.AccountInfo;
 import com.main.application.dto.BankResponse;
 import com.main.application.dto.EmailProperties;
+import com.main.application.dto.EnquiryRequest;
+import com.main.application.dto.TransactionRequest;
 import com.main.application.dto.UserRequest;
 import com.main.application.entity.User;
 import com.main.application.repository.UserRepo;
@@ -62,12 +64,100 @@ public class UserServiceImpl implements UserService {
                 return BankResponse.builder()
                                 .responseCode(AccountUtils.ACCOUNT_CREATION_CODE)
                                 .responseMessage(AccountUtils.ACCOUNT_CREATION_MESSAGE)
-                                .accountInfo(AccountInfo.builder()
-                                                .accountName(savedUser.getFirstName() + " " + savedUser.getLastName()
-                                                                + " " + savedUser.getOtherName())
-                                                .accountNumber(savedUser.getAccountNumber())
-                                                .accountBalance(savedUser.getAccountBalance())
-                                                .build())
+                                .accountInfo(AccountUtils.createAccountInfo(savedUser))
+                                .build();
+        }
+
+        @Override
+        public BankResponse balanceEnquiry(EnquiryRequest enquiryRequest) {
+                boolean isAccountExists = userRepo.existsByAccountNumber(enquiryRequest.getAccountNumber());
+
+                if (!isAccountExists)
+                        return BankResponse.builder()
+                                        .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
+                                        .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
+                                        .accountInfo(null)
+                                        .build();
+
+                User foundUser = userRepo.findByAccountNumber(enquiryRequest.getAccountNumber());
+
+                return BankResponse.builder()
+                                .responseCode(AccountUtils.ACCOUNT_FOUND_CODE)
+                                .responseMessage(AccountUtils.ACCOUNT_FOUND_Message)
+                                .accountInfo(AccountUtils.createAccountInfo(foundUser))
+                                .build();
+        }
+
+        @Override
+        public String nameEnquiry(EnquiryRequest enquiryRequest) {
+                boolean isAccountExists = userRepo.existsByAccountNumber(enquiryRequest.getAccountNumber());
+
+                if (!isAccountExists)
+                        return AccountUtils.ACCOUNT_EXISTS_MESSAGE;
+
+                User foundUser = userRepo.findByAccountNumber(enquiryRequest.getAccountNumber());
+
+                return foundUser.getFirstName() + " " + foundUser.getLastName() + " " + foundUser.getOtherName();
+        }
+
+        @Override
+        public BankResponse creditAccount(TransactionRequest transactionRequest) {
+                boolean isAccountExists = userRepo.existsByAccountNumber(transactionRequest.getAccountNumber());
+
+                if (!isAccountExists)
+                        return BankResponse.builder()
+                                        .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
+                                        .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
+                                        .accountInfo(null)
+                                        .build();
+
+                User foundUser = userRepo.findByAccountNumber(transactionRequest.getAccountNumber());
+
+                foundUser.setAccountBalance(
+                                foundUser.getAccountBalance().add(transactionRequest.getAmount()));
+                userRepo.save(foundUser);
+                return BankResponse.builder()
+                                .responseCode(AccountUtils.ACCOUNT_CREDITED_SUCCESS_CODE)
+                                .responseMessage(AccountUtils.ACCOUNT_CREDITED_SUCCESS_MESSAGE(
+                                                transactionRequest.getAccountNumber(), transactionRequest.getAmount(),
+                                                foundUser.getAccountBalance()))
+                                .accountInfo(AccountUtils.createAccountInfo(foundUser))
+                                .build();
+        }
+
+        @Override
+        public BankResponse debitAccount(TransactionRequest transactionRequest) {
+                boolean isAccountExists = userRepo.existsByAccountNumber(transactionRequest.getAccountNumber());
+
+                if (!isAccountExists)
+                        return BankResponse.builder()
+                                        .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
+                                        .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
+                                        .accountInfo(null)
+                                        .build();
+
+                User foundUser = userRepo.findByAccountNumber(transactionRequest.getAccountNumber());
+
+                double availableBalance = Double.parseDouble(foundUser.getAccountBalance().toString());
+                double debitAmount = Double.parseDouble(transactionRequest.getAmount().toString());
+
+                if (availableBalance < debitAmount)
+                        return BankResponse.builder()
+                                        .responseCode(AccountUtils.INSUFFICIENT_BALANCE_CODE)
+                                        .responseMessage(AccountUtils.INSUFFICIENT_BALANCE_MESSAGE(
+                                                        transactionRequest.getAccountNumber(),
+                                                        foundUser.getAccountBalance().toString()))
+                                        .accountInfo(AccountUtils.createAccountInfo(foundUser))
+                                        .build();
+
+                foundUser.setAccountBalance(foundUser.getAccountBalance().subtract(transactionRequest.getAmount()));
+                userRepo.save(foundUser);
+                return BankResponse.builder()
+                                .responseCode(AccountUtils.ACCOUNT_DEBITED_SUCCESS_CODE)
+                                .responseMessage(AccountUtils.ACCOUNT_DEBITED_SUCCESS_MESSAGE(
+                                                transactionRequest.getAccountNumber(), transactionRequest.getAmount(),
+                                                foundUser.getAccountBalance()))
+                                .accountInfo(AccountUtils.createAccountInfo(foundUser))
                                 .build();
         }
 }
