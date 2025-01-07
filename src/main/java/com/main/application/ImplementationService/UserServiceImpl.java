@@ -1,16 +1,13 @@
 package com.main.application.ImplementationService;
 
-import com.main.application.dto.AccountInfo;
-import com.main.application.dto.BankResponse;
-import com.main.application.dto.EmailProperties;
-import com.main.application.dto.EnquiryRequest;
-import com.main.application.dto.TransactionRequest;
-import com.main.application.dto.UserRequest;
+import com.main.application.dto.*;
 import com.main.application.entity.User;
 import com.main.application.repository.UserRepo;
 import com.main.application.service.EmailService;
+import com.main.application.service.TransactionService;
 import com.main.application.service.UserService;
 import com.main.application.utils.AccountUtils;
+import com.main.application.utils.EmailUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +19,8 @@ public class UserServiceImpl implements UserService {
         private UserRepo userRepo;
         @Autowired
         private EmailService emailService;
+        @Autowired
+        private TransactionService transactionService;
 
         @Override
         public BankResponse createAccount(UserRequest userRequest) {
@@ -52,11 +51,9 @@ public class UserServiceImpl implements UserService {
                 // sending mail alert
                 EmailProperties emailProperties = EmailProperties.builder()
                                 .recipient(savedUser.getEmail())
-                                .messageBody("Congratulation! your account has been successfully created.\n" +
-                                                "your account details!\n" +
-                                                "Account Name: " + savedUser.getFirstName() + " "
-                                                + savedUser.getLastName() + " " + savedUser.getOtherName() + "\n" +
-                                                "Account Number: " + savedUser.getAccountNumber())
+                                .messageBody(EmailUtils.SET_NEW_ACCOUNT_MESSAGE(
+                                        savedUser.getFirstName()+" "+savedUser.getLastName()
+                                ,savedUser.getAccountNumber()))
                                 .subject(AccountUtils.ACCOUNT_CREATION_MESSAGE)
                                 .build();
                 emailService.sendEmailAlert(emailProperties);
@@ -115,7 +112,25 @@ public class UserServiceImpl implements UserService {
 
                 foundUser.setAccountBalance(
                                 foundUser.getAccountBalance().add(transactionRequest.getAmount()));
+                TransactionDto creditTransactionRecord = TransactionDto.builder()
+                        .transactionType("CREDIT")
+                        .accountNumber(transactionRequest.getAccountNumber())
+                        .amount(transactionRequest.getAmount())
+                        .build();
+
                 userRepo.save(foundUser);
+                transactionService.saveTransaction(creditTransactionRecord);
+
+                EmailProperties creditAlert = EmailProperties.builder()
+                        .subject("CREDIT ALERT")
+                        .recipient(foundUser.getEmail())
+                        .messageBody(EmailUtils.ACCOUNT_CREDITED_EMAIL_MESSAGE(foundUser.getFirstName()+" "+foundUser.getLastName()
+                                ,transactionRequest.getAccountNumber(),
+                                transactionRequest.getAmount().toString(),
+                                foundUser.getAccountBalance().toString()))
+                        .build();
+                emailService.sendEmailAlert(creditAlert);
+
                 return BankResponse.builder()
                                 .responseCode(AccountUtils.ACCOUNT_CREDITED_SUCCESS_CODE)
                                 .responseMessage(AccountUtils.ACCOUNT_CREDITED_SUCCESS_MESSAGE(
@@ -151,7 +166,25 @@ public class UserServiceImpl implements UserService {
                                         .build();
 
                 foundUser.setAccountBalance(foundUser.getAccountBalance().subtract(transactionRequest.getAmount()));
+                TransactionDto debitTransactionRecord = TransactionDto.builder()
+                        .transactionType("DEBIT")
+                        .accountNumber(transactionRequest.getAccountNumber())
+                        .amount(transactionRequest.getAmount())
+                        .build();
+
                 userRepo.save(foundUser);
+                transactionService.saveTransaction(debitTransactionRecord);
+
+                EmailProperties debitAlert = EmailProperties.builder()
+                        .subject("DEBIT ALERT")
+                        .recipient(foundUser.getEmail())
+                        .messageBody(EmailUtils.ACCOUNT_DEBITED_EMAIL_MESSAGE(foundUser.getFirstName()+" "+foundUser.getLastName()
+                                ,transactionRequest.getAccountNumber(),
+                                transactionRequest.getAmount().toString(),
+                                foundUser.getAccountBalance().toString()))
+                        .build();
+                emailService.sendEmailAlert(debitAlert);
+
                 return BankResponse.builder()
                                 .responseCode(AccountUtils.ACCOUNT_DEBITED_SUCCESS_CODE)
                                 .responseMessage(AccountUtils.ACCOUNT_DEBITED_SUCCESS_MESSAGE(
@@ -160,4 +193,81 @@ public class UserServiceImpl implements UserService {
                                 .accountInfo(AccountUtils.createAccountInfo(foundUser))
                                 .build();
         }
+
+        @Override
+        public BankResponse transferAmount(TransferRequest transferRequest) {
+
+                boolean isDestinationAccountExists = userRepo.existsByAccountNumber(transferRequest.getDestinationAccountNumber());
+
+                if(!isDestinationAccountExists)
+                        return BankResponse.builder()
+                                .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
+                                .responseMessage(AccountUtils.ACCOUNT_DEBITED_NOT_EXISTS_MESSAGE(transferRequest.getDestinationAccountNumber()))
+                                .accountInfo(null)
+                                .build();
+
+
+                User sourceAccount = userRepo.findByAccountNumber(transferRequest.getSourceAccountNumber());
+                User destinationAccount = userRepo.findByAccountNumber(transferRequest.getDestinationAccountNumber());
+
+                /**
+                 *  that mean transfer amount is large
+                 *  source account doesn't have that amount of money.
+                 */
+
+                if(transferRequest.getAmount().compareTo(sourceAccount.getAccountBalance()) > 0)
+                        return BankResponse.builder()
+                                .responseCode(AccountUtils.INSUFFICIENT_BALANCE_CODE)
+                                .responseMessage(AccountUtils.INSUFFICIENT_BALANCE_MESSAGE(transferRequest.getSourceAccountNumber(), sourceAccount.getAccountBalance().toString()))
+                                .accountInfo(AccountUtils.createAccountInfo(sourceAccount))
+                                .build();
+
+                sourceAccount.setAccountBalance(sourceAccount.getAccountBalance().subtract(transferRequest.getAmount()));
+                TransactionDto debitTransactionRecord = TransactionDto.builder()
+                        .transactionType("DEBIT")
+                        .accountNumber(sourceAccount.getAccountNumber())
+                        .amount(transferRequest.getAmount())
+                        .build();
+                userRepo.save(sourceAccount);
+                transactionService.saveTransaction(debitTransactionRecord);
+
+                EmailProperties debitAlert = EmailProperties.builder()
+                        .subject("DEBIT ALERT")
+                        .recipient(sourceAccount.getEmail())
+                        .messageBody(EmailUtils.ACCOUNT_DEBITED_EMAIL_MESSAGE(sourceAccount.getFirstName()+" "+sourceAccount.getLastName(),
+                                transferRequest.getDestinationAccountNumber(),
+                                transferRequest.getAmount().toString(),
+                                sourceAccount.getAccountBalance().toString()))
+                        .build();
+                emailService.sendEmailAlert(debitAlert);
+
+                destinationAccount.setAccountBalance(destinationAccount.getAccountBalance().add(transferRequest.getAmount()));
+                TransactionDto creditTransactionRecord = TransactionDto.builder()
+                        .transactionType("CREDIT")
+                        .accountNumber(destinationAccount.getAccountNumber())
+                        .amount(transferRequest.getAmount())
+                        .build();
+
+                userRepo.save(destinationAccount);
+                transactionService.saveTransaction(creditTransactionRecord);
+                EmailProperties creditAlert = EmailProperties.builder()
+                        .subject("CREDIT ALERT")
+                        .recipient(destinationAccount.getEmail())
+                        .messageBody(EmailUtils.ACCOUNT_CREDITED_EMAIL_MESSAGE(destinationAccount.getFirstName()+" "+destinationAccount.getLastName()
+                                ,transferRequest.getSourceAccountNumber(),
+                                transferRequest.getAmount().toString(),
+                                destinationAccount.getAccountBalance().toString()))
+                        .build();
+                emailService.sendEmailAlert(creditAlert);
+
+                return BankResponse.builder()
+                        .responseCode(AccountUtils.TRANSACTION_SUCCESS_CODE)
+                        .responseMessage(AccountUtils.TRANSACTION_SUCCESS_MESSAGE("",
+                                sourceAccount.getAccountNumber(),
+                                destinationAccount.getAccountNumber(),
+                                transferRequest.getAmount().toString()))
+                        .accountInfo(null)
+                        .build();
+        }
+
 }
