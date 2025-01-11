@@ -1,5 +1,6 @@
 package com.main.application.dto;
 
+import com.main.application.entity.Role;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -18,6 +19,8 @@ public class UserRequest {
     private String accountNumber;
     private BigDecimal accountBalance;
     private String email;
+    private String password;
+    private Role role;
     private String phoneNumber;
     private String alternativePhoneNumber;
 }

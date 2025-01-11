@@ -1,14 +1,20 @@
 package com.main.application.ImplementationService;
 
 import com.main.application.dto.*;
+import com.main.application.entity.Role;
 import com.main.application.entity.User;
 import com.main.application.repository.UserRepo;
+import com.main.application.security.JwtTokenProvider;
 import com.main.application.service.EmailService;
 import com.main.application.service.TransactionService;
 import com.main.application.service.UserService;
 import com.main.application.utils.AccountUtils;
 import com.main.application.utils.EmailUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -21,6 +27,12 @@ public class UserServiceImpl implements UserService {
         private EmailService emailService;
         @Autowired
         private TransactionService transactionService;
+        @Autowired
+        private PasswordEncoder passwordEncoder;
+        @Autowired
+        private AuthenticationManager authenticationManager;
+        @Autowired
+        private JwtTokenProvider jwtTokenProvider;
 
         @Override
         public BankResponse createAccount(UserRequest userRequest) {
@@ -42,6 +54,8 @@ public class UserServiceImpl implements UserService {
                                 .accountNumber(AccountUtils.generateAccountNumber())
                                 .accountBalance(BigDecimal.ZERO)
                                 .email(userRequest.getEmail())
+                                .password(passwordEncoder.encode(userRequest.getPassword()))
+                                .role(Role.valueOf(userRequest.getRole().toString().toUpperCase()))
                                 .phoneNumber(userRequest.getPhoneNumber())
                                 .alternativePhoneNumber(userRequest.getAlternativePhoneNumber())
                                 .status("ACTIVE")
@@ -63,6 +77,42 @@ public class UserServiceImpl implements UserService {
                                 .responseMessage(AccountUtils.ACCOUNT_CREATION_MESSAGE)
                                 .accountInfo(AccountUtils.createAccountInfo(savedUser))
                                 .build();
+        }
+
+        @Override
+        public BankResponse updateAccount(UserRequest userRequest) {
+
+                if (!userRepo.existsByEmail(userRequest.getEmail()))
+                        return BankResponse.builder()
+                                .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
+                                .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
+                                .accountInfo(null)
+                                .build();
+
+                User savedUser = userRepo.findByEmail(userRequest.getEmail()).get();
+                User updatedInfo = User.builder()
+                        .firstName(userRequest.getFirstName() != null ? userRequest.getFirstName() : savedUser.getFirstName())
+                        .lastName(userRequest.getLastName() != null ? userRequest.getLastName() : savedUser.getLastName())
+                        .otherName(userRequest.getOtherName() != null ? userRequest.getOtherName() : savedUser.getOtherName())
+                        .gender(userRequest.getGender() != null ? userRequest.getGender() : savedUser.getGender())
+                        .address(userRequest.getAddress() != null ? userRequest.getAddress() : savedUser.getAddress())
+                        .stateOfOrigin(userRequest.getStateOfOrigin() != null ? userRequest.getStateOfOrigin() : savedUser.getStateOfOrigin())
+                        .accountNumber(savedUser.getAccountNumber()) // Assuming account number doesn't change
+                        .accountBalance(savedUser.getAccountBalance()) // Assuming account balance doesn't change
+                        .email(savedUser.getEmail()) // Email should not change
+                        .password(userRequest.getPassword() != null ? passwordEncoder.encode(userRequest.getPassword()) : savedUser.getPassword())
+                        .role(userRequest.getRole() != null ? Role.valueOf(userRequest.getRole().toString().toUpperCase()) : savedUser.getRole())
+                        .phoneNumber(userRequest.getPhoneNumber() != null ? userRequest.getPhoneNumber() : savedUser.getPhoneNumber())
+                        .alternativePhoneNumber(userRequest.getAlternativePhoneNumber() != null ? userRequest.getAlternativePhoneNumber() : savedUser.getAlternativePhoneNumber())
+                        .status(savedUser.getStatus()) // Assuming status doesn't change
+                        .build();
+                User savedData = userRepo.save(updatedInfo);
+
+                return BankResponse.builder()
+                        .responseCode(AccountUtils.ACCOUNT_UPDATED_CODE)
+                        .responseMessage(AccountUtils.ACCOUNT_UPDATED_MESSAGE)
+                        .accountInfo(AccountUtils.createAccountInfo(savedData))
+                        .build();
         }
 
         @Override
@@ -267,6 +317,24 @@ public class UserServiceImpl implements UserService {
                                 destinationAccount.getAccountNumber(),
                                 transferRequest.getAmount().toString()))
                         .accountInfo(null)
+                        .build();
+        }
+
+        @Override
+        public BankResponse login(LoginDto loginDto) {
+                Authentication authentication = authenticationManager.authenticate(
+                  new UsernamePasswordAuthenticationToken(loginDto.getEmail(),
+                          loginDto.getPassword())
+                );
+                EmailProperties loginAlert = EmailProperties.builder()
+                        .subject("You're logged in!")
+                        .recipient(loginDto.getEmail())
+                        .messageBody("You logged into your account!")
+                        .build();
+                emailService.sendEmailAlert(loginAlert);
+                return BankResponse.builder()
+                        .responseCode(AccountUtils.ACCOUNT_LOGIN_CODE)
+                        .responseMessage(jwtTokenProvider.generateToken(authentication))
                         .build();
         }
 

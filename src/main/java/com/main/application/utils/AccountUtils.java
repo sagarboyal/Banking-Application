@@ -24,6 +24,12 @@ public class AccountUtils {
     public static final String ACCOUNT_CREATION_CODE = "002";
     public static final String ACCOUNT_CREATION_MESSAGE = "Account has been successfully created!";
 
+    public static final String ACCOUNT_UPDATED_CODE = "010";
+    public static final String ACCOUNT_UPDATED_MESSAGE = "Account has been updated successfully!";
+
+    public static final String ACCOUNT_DELETE_CODE = "011";
+    public static final String ACCOUNT_DELETE_MESSAGE = "Account has been deleted successfully!";
+
     public static final String ACCOUNT_NOT_EXISTS_CODE = "003";
     public static final String ACCOUNT_NOT_EXISTS_Message = "User with the provide account number not exists!";
 
@@ -63,6 +69,9 @@ public class AccountUtils {
                 transactionId, senderAccount, recipientAccount,amountTransferred, currentTime);
 
     }
+
+    public static final String ACCOUNT_LOGIN_CODE = "201";
+    public static final String ACCOUNT_LOGIN_MESSAGE = "Account has been successfully logged in!";
 
     public static AccountInfo createAccountInfo(User user) {
         return AccountInfo.builder()
