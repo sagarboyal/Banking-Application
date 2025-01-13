@@ -38,7 +38,7 @@ This section describes how to set up and run the Bank Management API.
 1.  **Clone the repository:**
 
     ```bash
-    git clone [https://github.com/yourusername/bank-management-api.git](https://github.com/yourusername/bank-management-api.git)
+    git clone [https://github.com/yourusername/bank-management-api.git](https://github.com/sagarboyal/Banking-Application.git)
     ```
 
 2.  **Navigate to the project directory:**
@@ -220,8 +220,32 @@ Once you have obtained a JWT token from the login endpoint, you must include it 
 *   **Header:** `Authorization`
 *   **Value:** `Bearer <your-token>`
 
-**Example using `curl`:**
+
+# API Endpoints 
+
+**Authentication:** All endpoints in this API require JWT (JSON Web Token) authentication. You must include a valid JWT in the `Authorization` header of your requests using the `Bearer <your_jwt_token>` format.
+
+### User Authentication
+
+*   `POST /api/user/login`: User login (to obtain a JWT).
+*   `POST /api/user/register`: User registration.
+
+### User Account Information
+
+*   `GET /api/user/balance-enquiry`: Check account balance.
+*   `GET /api/user/name-enquiry`: Check account holder's name.
+
+### User Transactions
+
+*   `POST /api/user/debit`: Debit from account.
+*   `POST /api/user/credit`: Credit to account.
+*   `POST /api/user/transfer`: Transfer funds to another account.
+
+### Transactions
+
+*   `GET /api/transaction/bank-statement`: Retrieve bank statement.
+
+### Example Usage
 
 ```bash
-curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c" http://localhost:8080/
-  
+curl -H "Authorization: Bearer <your_jwt_token>" http://localhost:8080/api/user/balance-enquiry
