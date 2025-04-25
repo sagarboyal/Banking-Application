@@ -21,6 +21,7 @@ import java.io.OutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+
 @Slf4j
 @Service
 public class BankServiceImpl implements BankService {
@@ -34,10 +35,19 @@ public class BankServiceImpl implements BankService {
     private static final String FILE = "C:\\Users\\sboya\\Downloads\\bank-statement.pdf";
 
     @Override
-    public List<Transaction> generateStatement(String accountNumber, String startDate, String endDate) throws DocumentException, FileNotFoundException {
+    public List<Transaction> generateStatement(String accountNumber,
+                                               String startDate,
+                                               String endDate) throws FileNotFoundException, DocumentException {
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+        if(startDate == null || startDate.isEmpty()) startDate = LocalDate.now().minusDays(7)
+                .format(formatter);
+        if(endDate == null || endDate.isEmpty()) endDate = LocalDate.now().format(formatter);
+
         // Parse start and end dates
-        LocalDate start = LocalDate.parse(startDate, DateTimeFormatter.ISO_DATE);
-        LocalDate end = LocalDate.parse(endDate, DateTimeFormatter.ISO_DATE);
+        LocalDate start = LocalDate.parse(startDate, formatter);
+        LocalDate end = LocalDate.parse(endDate, formatter);
 
         // Log parsed dates
         System.out.println("Start Date: " + start.atStartOfDay());
@@ -61,6 +71,7 @@ public class BankServiceImpl implements BankService {
         Rectangle statementSize = new Rectangle(PageSize.A4);
         Document document = new Document(statementSize);
         log.info("setting size of document");
+
         OutputStream outputStream = new FileOutputStream(FILE);
 
         PdfWriter.getInstance(document, outputStream);

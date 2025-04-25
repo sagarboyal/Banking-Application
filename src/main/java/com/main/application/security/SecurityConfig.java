@@ -1,5 +1,6 @@
 package com.main.application.security;
 
+import com.main.application.jwt.AuthEntryPoint;
 import com.main.application.jwt.AuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,10 +26,12 @@ public class SecurityConfig {
 
     private final UserDetailsService userDetailsService;
     private final AuthFilter authFilter;
+    private final AuthEntryPoint unauthorizedHandler;
 
-    public SecurityConfig(UserDetailsService userDetailsService, AuthFilter authFilter) {
+    public SecurityConfig(UserDetailsService userDetailsService, AuthFilter authFilter, AuthEntryPoint unauthorizedHandler) {
         this.userDetailsService = userDetailsService;
         this.authFilter = authFilter;
+        this.unauthorizedHandler = unauthorizedHandler;
     }
 
     @Bean
@@ -54,13 +57,13 @@ public class SecurityConfig {
         return httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/user/login", "/api/user/register").permitAll()
-                        .requestMatchers("/swagger-ui/**").permitAll()
-                        .anyRequest()
-                        .authenticated())
+                        .requestMatchers("/swagger-ui/**", "api/auth/**").permitAll()
+                        .anyRequest().authenticated())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
+                .exceptionHandling(exception ->
+                        exception.authenticationEntryPoint(unauthorizedHandler))
                 .addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

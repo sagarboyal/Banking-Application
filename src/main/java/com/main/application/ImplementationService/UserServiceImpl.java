@@ -4,6 +4,8 @@ import com.main.application.constraint.AccountConstraint;
 import com.main.application.dto.*;
 import com.main.application.entity.Role;
 import com.main.application.entity.User;
+import com.main.application.exception.ResourceFoundException;
+import com.main.application.exception.ResourceNotFoundException;
 import com.main.application.payload.request.EnquiryRequest;
 import com.main.application.payload.request.TransactionRequest;
 import com.main.application.payload.request.TransferRequest;
@@ -16,40 +18,39 @@ import com.main.application.service.TransactionService;
 import com.main.application.service.UserService;
 import com.main.application.utils.AccountUtils;
 import com.main.application.utils.EmailUtils;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
-        @Autowired
-        private UserRepo userRepo;
-        @Autowired
-        private EmailService emailService;
-        @Autowired
-        private TransactionService transactionService;
-        @Autowired
-        private PasswordEncoder passwordEncoder;
-        @Autowired
-        private AuthenticationManager authenticationManager;
-        @Autowired
-        private JwtTokenProvider jwtTokenProvider;
+
+        private final UserRepo userRepo;
+        private final EmailService emailService;
+        private final TransactionService transactionService;
+        private final PasswordEncoder passwordEncoder;
+        private final AuthenticationManager authenticationManager;
+        private final JwtTokenProvider jwtTokenProvider;
 
         @Override
         public BankResponse createAccount(UserRequest userRequest) {
 
                 if (userRepo.existsByEmail(userRequest.getEmail()))
-                        return BankResponse.builder()
-                                        .responseCode(AccountConstraint.ACCOUNT_EXISTS_CODE)
-                                        .responseMessage(AccountConstraint.ACCOUNT_EXISTS_MESSAGE)
-                                        .accountResponse(null)
-                                        .build();
+                        throw new ResourceFoundException(userRequest.getEmail(), "email");
 
                 if (userRequest.getRole() != null && !EnumSet.allOf(Role.class).contains(userRequest.getRole())) {
                         throw new RuntimeException("Invalid role provided");
@@ -95,15 +96,9 @@ public class UserServiceImpl implements UserService {
 
         @Override
         public BankResponse updateAccount(UserRequest userRequest) {
+                User savedUser = userRepo.findByEmail(userRequest.getEmail()).
+                        orElseThrow(() -> new ResourceNotFoundException(userRequest.getEmail(), "email"));
 
-                if (!userRepo.existsByEmail(userRequest.getEmail()))
-                        return BankResponse.builder()
-                                .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
-                                .responseMessage(AccountConstraint.ACCOUNT_NOT_EXISTS_Message)
-                                .accountResponse(null)
-                                .build();
-
-                User savedUser = userRepo.findByEmail(userRequest.getEmail()).get();
                 User updatedInfo = User.builder()
                         .firstName(userRequest.getFirstName() != null ? userRequest.getFirstName() : savedUser.getFirstName())
                         .lastName(userRequest.getLastName() != null ? userRequest.getLastName() : savedUser.getLastName())
@@ -134,11 +129,7 @@ public class UserServiceImpl implements UserService {
                 boolean isAccountExists = userRepo.existsByAccountNumber(enquiryRequest.getAccountNumber());
 
                 if (!isAccountExists)
-                        return BankResponse.builder()
-                                        .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
-                                        .responseMessage(AccountConstraint.ACCOUNT_NOT_EXISTS_Message)
-                                        .accountResponse(null)
-                                        .build();
+                        throw new ResourceNotFoundException(enquiryRequest.getAccountNumber(), "accountNumber");
 
                 User foundUser = userRepo.findByAccountNumber(enquiryRequest.getAccountNumber());
 
@@ -154,7 +145,7 @@ public class UserServiceImpl implements UserService {
                 boolean isAccountExists = userRepo.existsByAccountNumber(enquiryRequest.getAccountNumber());
 
                 if (!isAccountExists)
-                        return AccountConstraint.ACCOUNT_EXISTS_MESSAGE;
+                        throw new ResourceNotFoundException(enquiryRequest.getAccountNumber(), "accountNumber");
 
                 User foundUser = userRepo.findByAccountNumber(enquiryRequest.getAccountNumber());
 
@@ -209,11 +200,7 @@ public class UserServiceImpl implements UserService {
                 boolean isAccountExists = userRepo.existsByAccountNumber(transactionRequest.getAccountNumber());
 
                 if (!isAccountExists)
-                        return BankResponse.builder()
-                                        .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
-                                        .responseMessage(AccountConstraint.ACCOUNT_NOT_EXISTS_Message)
-                                        .accountResponse(null)
-                                        .build();
+                        throw new ResourceNotFoundException(transactionRequest.getAccountNumber(), "accountNumber");
 
                 User foundUser = userRepo.findByAccountNumber(transactionRequest.getAccountNumber());
 
@@ -336,6 +323,7 @@ public class UserServiceImpl implements UserService {
 
         @Override
         public BankResponse login(LoginDto loginDto) {
+
                 Authentication authentication = authenticationManager.authenticate(
                   new UsernamePasswordAuthenticationToken(loginDto.getEmail(),
                           loginDto.getPassword())
@@ -345,7 +333,7 @@ public class UserServiceImpl implements UserService {
                         .recipient(loginDto.getEmail())
                         .messageBody("You logged into your account!")
                         .build();
-                emailService.sendEmailAlert(loginAlert);
+                //emailService.sendEmailAlert(loginAlert);
                 return BankResponse.builder()
                         .responseCode(AccountConstraint.ACCOUNT_LOGIN_CODE)
                         .responseMessage(jwtTokenProvider.generateToken(authentication))
