@@ -1,4 +1,4 @@
-package com.main.application.dto;
+package com.main.application.payload.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,8 +11,8 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AccountInfo {
-    private String accountName;
-    private BigDecimal accountBalance;
-    private String accountNumber;
+public class TransferRequest {
+    private String sourceAccountNumber;
+    private String destinationAccountNumber;
+    private BigDecimal amount;
 }

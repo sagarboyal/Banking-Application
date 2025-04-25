@@ -4,7 +4,7 @@ import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
-import com.main.application.dto.EmailProperties;
+import com.main.application.dto.EmailPropertiesDto;
 import com.main.application.entity.Transaction;
 import com.main.application.entity.User;
 import com.main.application.repository.TransactionRepo;
@@ -130,7 +130,7 @@ public class BankServiceImpl implements BankService {
         document.add(transactionTable);
 
         document.close();
-        EmailProperties email = EmailProperties.builder()
+        EmailPropertiesDto email = EmailPropertiesDto.builder()
                 .recipient(userAccount.getEmail())
                 .subject("e-bank statements")
                 .messageBody("This is your last month transactions")

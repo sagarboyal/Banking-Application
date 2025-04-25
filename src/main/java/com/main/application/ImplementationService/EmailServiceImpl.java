@@ -1,6 +1,6 @@
 package com.main.application.ImplementationService;
 
-import com.main.application.dto.EmailProperties;
+import com.main.application.dto.EmailPropertiesDto;
 import com.main.application.service.EmailService;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +11,6 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.mail.javamail.MimeMessagePreparator;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -25,7 +24,7 @@ public class EmailServiceImpl implements EmailService {
     private String senderEmail;
 
     @Override
-    public void sendEmailAlert(EmailProperties properties) {
+    public void sendEmailAlert(EmailPropertiesDto properties) {
         try {
             SimpleMailMessage mailMessage = new SimpleMailMessage();
             mailMessage.setFrom(senderEmail);
@@ -35,16 +34,16 @@ public class EmailServiceImpl implements EmailService {
 
             javaMailSender.send(mailMessage);
             System.out.println("Mail sent successfully");
-        }catch (MailException e){
+        } catch (MailException e) {
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void sendEmailWithAttachments(EmailProperties properties) {
+    public void sendEmailWithAttachments(EmailPropertiesDto properties) {
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
         MimeMessageHelper mimeMessageHelper;
-        try{
+        try {
             mimeMessageHelper = new MimeMessageHelper(mimeMessage, true);
             mimeMessageHelper.setFrom(senderEmail);
             mimeMessageHelper.setTo(properties.getRecipient());
@@ -56,7 +55,6 @@ public class EmailServiceImpl implements EmailService {
             javaMailSender.send(mimeMessage);
 
             log.info("{} has been sent to user with email {}", systemResource.getFilename(), properties.getRecipient());
-
 
         } catch (Exception e) {
             throw new RuntimeException(e);

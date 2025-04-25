@@ -1,10 +1,16 @@
 package com.main.application.ImplementationService;
 
+import com.main.application.constraint.AccountConstraint;
 import com.main.application.dto.*;
 import com.main.application.entity.Role;
 import com.main.application.entity.User;
+import com.main.application.payload.request.EnquiryRequest;
+import com.main.application.payload.request.TransactionRequest;
+import com.main.application.payload.request.TransferRequest;
+import com.main.application.payload.request.UserRequest;
+import com.main.application.payload.response.BankResponse;
 import com.main.application.repository.UserRepo;
-import com.main.application.security.JwtTokenProvider;
+import com.main.application.jwt.JwtTokenProvider;
 import com.main.application.service.EmailService;
 import com.main.application.service.TransactionService;
 import com.main.application.service.UserService;
@@ -18,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.EnumSet;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -39,10 +46,17 @@ public class UserServiceImpl implements UserService {
 
                 if (userRepo.existsByEmail(userRequest.getEmail()))
                         return BankResponse.builder()
-                                        .responseCode(AccountUtils.ACCOUNT_EXISTS_CODE)
-                                        .responseMessage(AccountUtils.ACCOUNT_EXISTS_MESSAGE)
-                                        .accountInfo(null)
+                                        .responseCode(AccountConstraint.ACCOUNT_EXISTS_CODE)
+                                        .responseMessage(AccountConstraint.ACCOUNT_EXISTS_MESSAGE)
+                                        .accountResponse(null)
                                         .build();
+
+                if (userRequest.getRole() != null && !EnumSet.allOf(Role.class).contains(userRequest.getRole())) {
+                        throw new RuntimeException("Invalid role provided");
+                }
+
+                Role role = userRequest.getRole() != null ?
+                        Role.valueOf(userRequest.getRole().toString().toUpperCase()) : Role.USER;
 
                 User newUser = User.builder()
                                 .firstName(userRequest.getFirstName())
@@ -55,7 +69,7 @@ public class UserServiceImpl implements UserService {
                                 .accountBalance(BigDecimal.ZERO)
                                 .email(userRequest.getEmail())
                                 .password(passwordEncoder.encode(userRequest.getPassword()))
-                                .role(Role.valueOf(userRequest.getRole().toString().toUpperCase()))
+                                .role(role)
                                 .phoneNumber(userRequest.getPhoneNumber())
                                 .alternativePhoneNumber(userRequest.getAlternativePhoneNumber())
                                 .status("ACTIVE")
@@ -63,19 +77,19 @@ public class UserServiceImpl implements UserService {
 
                 User savedUser = userRepo.save(newUser);
                 // sending mail alert
-                EmailProperties emailProperties = EmailProperties.builder()
+                EmailPropertiesDto emailPropertiesDto = EmailPropertiesDto.builder()
                                 .recipient(savedUser.getEmail())
                                 .messageBody(EmailUtils.SET_NEW_ACCOUNT_MESSAGE(
                                         savedUser.getFirstName()+" "+savedUser.getLastName()
                                 ,savedUser.getAccountNumber()))
-                                .subject(AccountUtils.ACCOUNT_CREATION_MESSAGE)
+                                .subject(AccountConstraint.ACCOUNT_CREATION_MESSAGE)
                                 .build();
-                emailService.sendEmailAlert(emailProperties);
+                emailService.sendEmailAlert(emailPropertiesDto);
 
                 return BankResponse.builder()
-                                .responseCode(AccountUtils.ACCOUNT_CREATION_CODE)
-                                .responseMessage(AccountUtils.ACCOUNT_CREATION_MESSAGE)
-                                .accountInfo(AccountUtils.createAccountInfo(savedUser))
+                                .responseCode(AccountConstraint.ACCOUNT_CREATION_CODE)
+                                .responseMessage(AccountConstraint.ACCOUNT_CREATION_MESSAGE)
+                                .accountResponse(AccountUtils.createAccountInfo(savedUser))
                                 .build();
         }
 
@@ -84,9 +98,9 @@ public class UserServiceImpl implements UserService {
 
                 if (!userRepo.existsByEmail(userRequest.getEmail()))
                         return BankResponse.builder()
-                                .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
-                                .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
-                                .accountInfo(null)
+                                .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
+                                .responseMessage(AccountConstraint.ACCOUNT_NOT_EXISTS_Message)
+                                .accountResponse(null)
                                 .build();
 
                 User savedUser = userRepo.findByEmail(userRequest.getEmail()).get();
@@ -109,9 +123,9 @@ public class UserServiceImpl implements UserService {
                 User savedData = userRepo.save(updatedInfo);
 
                 return BankResponse.builder()
-                        .responseCode(AccountUtils.ACCOUNT_UPDATED_CODE)
-                        .responseMessage(AccountUtils.ACCOUNT_UPDATED_MESSAGE)
-                        .accountInfo(AccountUtils.createAccountInfo(savedData))
+                        .responseCode(AccountConstraint.ACCOUNT_UPDATED_CODE)
+                        .responseMessage(AccountConstraint.ACCOUNT_UPDATED_MESSAGE)
+                        .accountResponse(AccountUtils.createAccountInfo(savedData))
                         .build();
         }
 
@@ -121,17 +135,17 @@ public class UserServiceImpl implements UserService {
 
                 if (!isAccountExists)
                         return BankResponse.builder()
-                                        .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
-                                        .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
-                                        .accountInfo(null)
+                                        .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
+                                        .responseMessage(AccountConstraint.ACCOUNT_NOT_EXISTS_Message)
+                                        .accountResponse(null)
                                         .build();
 
                 User foundUser = userRepo.findByAccountNumber(enquiryRequest.getAccountNumber());
 
                 return BankResponse.builder()
-                                .responseCode(AccountUtils.ACCOUNT_FOUND_CODE)
-                                .responseMessage(AccountUtils.ACCOUNT_FOUND_Message)
-                                .accountInfo(AccountUtils.createAccountInfo(foundUser))
+                                .responseCode(AccountConstraint.ACCOUNT_FOUND_CODE)
+                                .responseMessage(AccountConstraint.ACCOUNT_FOUND_Message)
+                                .accountResponse(AccountUtils.createAccountInfo(foundUser))
                                 .build();
         }
 
@@ -140,7 +154,7 @@ public class UserServiceImpl implements UserService {
                 boolean isAccountExists = userRepo.existsByAccountNumber(enquiryRequest.getAccountNumber());
 
                 if (!isAccountExists)
-                        return AccountUtils.ACCOUNT_EXISTS_MESSAGE;
+                        return AccountConstraint.ACCOUNT_EXISTS_MESSAGE;
 
                 User foundUser = userRepo.findByAccountNumber(enquiryRequest.getAccountNumber());
 
@@ -153,9 +167,9 @@ public class UserServiceImpl implements UserService {
 
                 if (!isAccountExists)
                         return BankResponse.builder()
-                                        .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
-                                        .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
-                                        .accountInfo(null)
+                                        .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
+                                        .responseMessage(AccountConstraint.ACCOUNT_NOT_EXISTS_Message)
+                                        .accountResponse(null)
                                         .build();
 
                 User foundUser = userRepo.findByAccountNumber(transactionRequest.getAccountNumber());
@@ -171,7 +185,7 @@ public class UserServiceImpl implements UserService {
                 userRepo.save(foundUser);
                 transactionService.saveTransaction(creditTransactionRecord);
 
-                EmailProperties creditAlert = EmailProperties.builder()
+                EmailPropertiesDto creditAlert = EmailPropertiesDto.builder()
                         .subject("CREDIT ALERT")
                         .recipient(foundUser.getEmail())
                         .messageBody(EmailUtils.ACCOUNT_CREDITED_EMAIL_MESSAGE(foundUser.getFirstName()+" "+foundUser.getLastName()
@@ -182,11 +196,11 @@ public class UserServiceImpl implements UserService {
                 emailService.sendEmailAlert(creditAlert);
 
                 return BankResponse.builder()
-                                .responseCode(AccountUtils.ACCOUNT_CREDITED_SUCCESS_CODE)
-                                .responseMessage(AccountUtils.ACCOUNT_CREDITED_SUCCESS_MESSAGE(
+                                .responseCode(AccountConstraint.ACCOUNT_CREDITED_SUCCESS_CODE)
+                                .responseMessage(AccountConstraint.ACCOUNT_CREDITED_SUCCESS_MESSAGE(
                                                 transactionRequest.getAccountNumber(), transactionRequest.getAmount(),
                                                 foundUser.getAccountBalance()))
-                                .accountInfo(AccountUtils.createAccountInfo(foundUser))
+                                .accountResponse(AccountUtils.createAccountInfo(foundUser))
                                 .build();
         }
 
@@ -196,9 +210,9 @@ public class UserServiceImpl implements UserService {
 
                 if (!isAccountExists)
                         return BankResponse.builder()
-                                        .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
-                                        .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_Message)
-                                        .accountInfo(null)
+                                        .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
+                                        .responseMessage(AccountConstraint.ACCOUNT_NOT_EXISTS_Message)
+                                        .accountResponse(null)
                                         .build();
 
                 User foundUser = userRepo.findByAccountNumber(transactionRequest.getAccountNumber());
@@ -208,11 +222,11 @@ public class UserServiceImpl implements UserService {
 
                 if (availableBalance < debitAmount)
                         return BankResponse.builder()
-                                        .responseCode(AccountUtils.INSUFFICIENT_BALANCE_CODE)
-                                        .responseMessage(AccountUtils.INSUFFICIENT_BALANCE_MESSAGE(
+                                        .responseCode(AccountConstraint.INSUFFICIENT_BALANCE_CODE)
+                                        .responseMessage(AccountConstraint.INSUFFICIENT_BALANCE_MESSAGE(
                                                         transactionRequest.getAccountNumber(),
                                                         foundUser.getAccountBalance().toString()))
-                                        .accountInfo(AccountUtils.createAccountInfo(foundUser))
+                                        .accountResponse(AccountUtils.createAccountInfo(foundUser))
                                         .build();
 
                 foundUser.setAccountBalance(foundUser.getAccountBalance().subtract(transactionRequest.getAmount()));
@@ -225,7 +239,7 @@ public class UserServiceImpl implements UserService {
                 userRepo.save(foundUser);
                 transactionService.saveTransaction(debitTransactionRecord);
 
-                EmailProperties debitAlert = EmailProperties.builder()
+                EmailPropertiesDto debitAlert = EmailPropertiesDto.builder()
                         .subject("DEBIT ALERT")
                         .recipient(foundUser.getEmail())
                         .messageBody(EmailUtils.ACCOUNT_DEBITED_EMAIL_MESSAGE(foundUser.getFirstName()+" "+foundUser.getLastName()
@@ -236,11 +250,11 @@ public class UserServiceImpl implements UserService {
                 emailService.sendEmailAlert(debitAlert);
 
                 return BankResponse.builder()
-                                .responseCode(AccountUtils.ACCOUNT_DEBITED_SUCCESS_CODE)
-                                .responseMessage(AccountUtils.ACCOUNT_DEBITED_SUCCESS_MESSAGE(
+                                .responseCode(AccountConstraint.ACCOUNT_DEBITED_SUCCESS_CODE)
+                                .responseMessage(AccountConstraint.ACCOUNT_DEBITED_SUCCESS_MESSAGE(
                                                 transactionRequest.getAccountNumber(), transactionRequest.getAmount(),
                                                 foundUser.getAccountBalance()))
-                                .accountInfo(AccountUtils.createAccountInfo(foundUser))
+                                .accountResponse(AccountUtils.createAccountInfo(foundUser))
                                 .build();
         }
 
@@ -251,9 +265,9 @@ public class UserServiceImpl implements UserService {
 
                 if(!isDestinationAccountExists)
                         return BankResponse.builder()
-                                .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
-                                .responseMessage(AccountUtils.ACCOUNT_DEBITED_NOT_EXISTS_MESSAGE(transferRequest.getDestinationAccountNumber()))
-                                .accountInfo(null)
+                                .responseCode(AccountConstraint.ACCOUNT_NOT_EXISTS_CODE)
+                                .responseMessage(AccountConstraint.ACCOUNT_DEBITED_NOT_EXISTS_MESSAGE(transferRequest.getDestinationAccountNumber()))
+                                .accountResponse(null)
                                 .build();
 
 
@@ -267,9 +281,9 @@ public class UserServiceImpl implements UserService {
 
                 if(transferRequest.getAmount().compareTo(sourceAccount.getAccountBalance()) > 0)
                         return BankResponse.builder()
-                                .responseCode(AccountUtils.INSUFFICIENT_BALANCE_CODE)
-                                .responseMessage(AccountUtils.INSUFFICIENT_BALANCE_MESSAGE(transferRequest.getSourceAccountNumber(), sourceAccount.getAccountBalance().toString()))
-                                .accountInfo(AccountUtils.createAccountInfo(sourceAccount))
+                                .responseCode(AccountConstraint.INSUFFICIENT_BALANCE_CODE)
+                                .responseMessage(AccountConstraint.INSUFFICIENT_BALANCE_MESSAGE(transferRequest.getSourceAccountNumber(), sourceAccount.getAccountBalance().toString()))
+                                .accountResponse(AccountUtils.createAccountInfo(sourceAccount))
                                 .build();
 
                 sourceAccount.setAccountBalance(sourceAccount.getAccountBalance().subtract(transferRequest.getAmount()));
@@ -281,7 +295,7 @@ public class UserServiceImpl implements UserService {
                 userRepo.save(sourceAccount);
                 transactionService.saveTransaction(debitTransactionRecord);
 
-                EmailProperties debitAlert = EmailProperties.builder()
+                EmailPropertiesDto debitAlert = EmailPropertiesDto.builder()
                         .subject("DEBIT ALERT")
                         .recipient(sourceAccount.getEmail())
                         .messageBody(EmailUtils.ACCOUNT_DEBITED_EMAIL_MESSAGE(sourceAccount.getFirstName()+" "+sourceAccount.getLastName(),
@@ -300,7 +314,7 @@ public class UserServiceImpl implements UserService {
 
                 userRepo.save(destinationAccount);
                 transactionService.saveTransaction(creditTransactionRecord);
-                EmailProperties creditAlert = EmailProperties.builder()
+                EmailPropertiesDto creditAlert = EmailPropertiesDto.builder()
                         .subject("CREDIT ALERT")
                         .recipient(destinationAccount.getEmail())
                         .messageBody(EmailUtils.ACCOUNT_CREDITED_EMAIL_MESSAGE(destinationAccount.getFirstName()+" "+destinationAccount.getLastName()
@@ -311,12 +325,12 @@ public class UserServiceImpl implements UserService {
                 emailService.sendEmailAlert(creditAlert);
 
                 return BankResponse.builder()
-                        .responseCode(AccountUtils.TRANSACTION_SUCCESS_CODE)
-                        .responseMessage(AccountUtils.TRANSACTION_SUCCESS_MESSAGE("",
+                        .responseCode(AccountConstraint.TRANSACTION_SUCCESS_CODE)
+                        .responseMessage(AccountConstraint.TRANSACTION_SUCCESS_MESSAGE("",
                                 sourceAccount.getAccountNumber(),
                                 destinationAccount.getAccountNumber(),
                                 transferRequest.getAmount().toString()))
-                        .accountInfo(null)
+                        .accountResponse(null)
                         .build();
         }
 
@@ -326,14 +340,14 @@ public class UserServiceImpl implements UserService {
                   new UsernamePasswordAuthenticationToken(loginDto.getEmail(),
                           loginDto.getPassword())
                 );
-                EmailProperties loginAlert = EmailProperties.builder()
+                EmailPropertiesDto loginAlert = EmailPropertiesDto.builder()
                         .subject("You're logged in!")
                         .recipient(loginDto.getEmail())
                         .messageBody("You logged into your account!")
                         .build();
                 emailService.sendEmailAlert(loginAlert);
                 return BankResponse.builder()
-                        .responseCode(AccountUtils.ACCOUNT_LOGIN_CODE)
+                        .responseCode(AccountConstraint.ACCOUNT_LOGIN_CODE)
                         .responseMessage(jwtTokenProvider.generateToken(authentication))
                         .build();
         }

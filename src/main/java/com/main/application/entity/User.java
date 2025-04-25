@@ -34,7 +34,8 @@ public class User implements UserDetails {
     private BigDecimal accountBalance;
     private String email;
     private String password;
-    @Enumerated(EnumType.STRING) // Specify EnumType.STRING to store as a string
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Role role;
     private String phoneNumber;
     private String alternativePhoneNumber;
@@ -47,7 +48,7 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of( new SimpleGrantedAuthority(role.name()));
+        return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
     @Override

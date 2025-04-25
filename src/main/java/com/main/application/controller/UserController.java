@@ -1,6 +1,11 @@
 package com.main.application.controller;
 
 import com.main.application.dto.*;
+import com.main.application.payload.request.EnquiryRequest;
+import com.main.application.payload.request.TransactionRequest;
+import com.main.application.payload.request.TransferRequest;
+import com.main.application.payload.request.UserRequest;
+import com.main.application.payload.response.BankResponse;
 import com.main.application.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

@@ -1,4 +1,4 @@
-package com.main.application.dto;
+package com.main.application.payload.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,4 +1,4 @@
-package com.main.application.dto;
+package com.main.application.payload.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class BankResponse {
     private String responseCode;
     private String responseMessage;
-    private AccountInfo accountInfo;
+    private AccountResponse accountResponse;
 }
