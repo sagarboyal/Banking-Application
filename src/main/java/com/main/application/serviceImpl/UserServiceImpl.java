@@ -326,7 +326,7 @@ public class UserServiceImpl implements UserService {
                         .recipient(loginDto.getEmail())
                         .messageBody("You logged into your account!")
                         .build();
-                //emailService.sendEmailAlert(loginAlert);
+                emailService.sendEmailAlert(loginAlert);
                 return BankResponse.builder()
                         .responseCode(AccountConstraint.ACCOUNT_LOGIN_CODE)
                         .responseMessage(jwtTokenProvider.generateToken(authentication))
