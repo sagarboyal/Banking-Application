@@ -1,4 +1,4 @@
-package com.main.application.ImplementationService;
+package com.main.application.serviceImpl;
 
 import com.main.application.dto.EmailPropertiesDto;
 import com.main.application.service.EmailService;

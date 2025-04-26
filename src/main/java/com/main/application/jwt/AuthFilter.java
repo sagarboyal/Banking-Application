@@ -1,6 +1,6 @@
 package com.main.application.jwt;
 
-import com.main.application.ImplementationService.CustomUserDetailsServiceImpl;
+import com.main.application.serviceImpl.CustomUserDetailsServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
