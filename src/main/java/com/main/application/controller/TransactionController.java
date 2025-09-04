@@ -25,7 +25,7 @@ public class TransactionController {
                                                                    @RequestParam(required = false) String startDate,
                                                                    @RequestParam(required = false) String endDate)
                                                                     throws DocumentException, FileNotFoundException {
-        return ResponseEntity.status(HttpStatus.FOUND)
+        return ResponseEntity.status(HttpStatus.OK)
                 .body(bankService.generateStatement(accountNumber, startDate, endDate));
 
     }
